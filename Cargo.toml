@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.98"
+futures = "0.3.31"
+tokio = {version = "1.47.1", features = ["full"]}
+yellowstone-grpc-client = "8.0.0"
+yellowstone-grpc-proto = "8.0.0"
