@@ -2,7 +2,7 @@ use {
     crate::grpc::handle_grpc_streams,
     futures::future::join_all,
     std::sync::Arc,
-    tokio::sync::mpsc,
+    tokio::sync::{broadcast, mpsc},
     tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt},
     yellowstone_grpc_proto::geyser::{SubscribeUpdateBlock, SubscribeUpdateTransaction},
 };
@@ -24,13 +24,22 @@ async fn main() -> Result<(), anyhow::Error> {
         .with(stdout_layer)
         .init();
 
+    let (shutdown_sender, _shutdown_receiver) = broadcast::channel::<bool>(1);
+
     let (block_sender, _block_receiver) = mpsc::unbounded_channel::<SubscribeUpdateBlock>();
     let (tx_sender, _tx_receiver) = mpsc::unbounded_channel::<SubscribeUpdateTransaction>();
 
     let tx_sender_arc = Arc::new(tx_sender);
     let block_sender_arc = Arc::new(block_sender);
+    let shutdown_sender_arc = Arc::new(shutdown_sender);
 
-    let jh_grpc = match handle_grpc_streams(block_sender_arc, tx_sender_arc).await {
+    let jh_grpc = match handle_grpc_streams(
+        block_sender_arc.clone(),
+        tx_sender_arc.clone(),
+        shutdown_sender_arc.clone(),
+    )
+    .await
+    {
         Ok(r) => r,
         Err(e) => {
             tracing::error!("Error: unable to handle grpc stream {:?}", e);

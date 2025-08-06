@@ -1,8 +1,11 @@
 use {
     crate::config::Config,
     futures::StreamExt,
-    std::sync::{Arc, mpsc},
-    tokio::{sync::mpsc::UnboundedSender, task::JoinHandle},
+    std::sync::Arc,
+    tokio::{
+        sync::{broadcast::Sender, mpsc::UnboundedSender},
+        task::JoinHandle,
+    },
     yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcBuilder, GeyserGrpcClient},
     yellowstone_grpc_proto::geyser::{
         CommitmentLevel, SubscribeRequest, SubscribeRequestFilterBlocks,
@@ -53,6 +56,7 @@ pub fn grpc_client_subscribe_request() -> SubscribeRequest {
 pub async fn handle_grpc_streams(
     block_sender: Arc<UnboundedSender<SubscribeUpdateBlock>>,
     tx_sender: Arc<UnboundedSender<SubscribeUpdateTransaction>>,
+    shutdown_sender: Arc<Sender<bool>>,
 ) -> Result<JoinHandle<()>, anyhow::Error> {
     let grpc_client = create_grpc_client()?;
 
@@ -74,10 +78,20 @@ pub async fn handle_grpc_streams(
         }
     };
 
+    let mut shutdown_rx = shutdown_sender.subscribe();
+
     let jh = tokio::spawn(async move {
-        while let Some(msg) = stream.next().await {
-            match msg {
-                Ok(message) => match message.update_oneof {
+        loop {
+            tokio::select! {
+                _ = shutdown_rx.recv() => {
+                tracing::info!("Shutdown signal received");
+                    break;
+                }
+
+                Some(msg) = stream.next() => {
+
+                    match msg {
+                                 Ok(message) => match message.update_oneof {
                     Some(UpdateOneof::Block(message)) => {
                         if let Err(e) = block_sender.send(message) {
                             tracing::error!("Error: unable to send block update {:?}", e);
@@ -91,9 +105,16 @@ pub async fn handle_grpc_streams(
                         }
                     }
                     _ => {}
-                },
-                Err(e) => {
-                    tracing::error!("Error: unable to parse stream data {:?}", e);
+                }
+                        Err(e)=>{
+                            tracing::error!("Error: unable to handle subscribe message: {:?}",e)
+                        }
+                    }
+                }
+
+                else => {
+                    tracing::info!("Both shutdown and stream closed");
+                    break;
                 }
             }
         }
