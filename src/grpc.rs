@@ -17,7 +17,7 @@ pub fn create_grpc_client() -> Result<GeyserGrpcBuilder, anyhow::Error> {
     let config = Config::load_from_env().expect("Error: unable to load config");
 
     let client = GeyserGrpcClient::build_from_shared(config.grpc_url.clone())?
-        .x_token(Some(config.x_token.clone()))?
+        .x_token(config.x_token.clone())?
         .tls_config(ClientTlsConfig::new().with_native_roots())?;
 
     Ok(client)
@@ -54,8 +54,8 @@ pub fn grpc_client_subscribe_request() -> SubscribeRequest {
 }
 
 pub async fn handle_grpc_streams(
-    block_sender: Arc<UnboundedSender<SubscribeUpdateBlock>>,
-    tx_sender: Arc<UnboundedSender<SubscribeUpdateTransaction>>,
+    block_sender: Arc<Sender<SubscribeUpdateBlock>>,
+    tx_sender: Arc<Sender<SubscribeUpdateTransaction>>,
     shutdown_sender: Arc<Sender<bool>>,
 ) -> Result<JoinHandle<()>, anyhow::Error> {
     let grpc_client = create_grpc_client()?;
