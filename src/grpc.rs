@@ -58,12 +58,16 @@ pub async fn handle_grpc_streams(
 
     let subscribe_request: SubscribeRequest = grpc_client_subscribe_request();
 
-    let (mut subscribe, mut stream) = match grpc_client.connect().await {
+    let (mut _subscribe, mut stream) = match grpc_client.connect().await {
         Ok(mut r) => match r.subscribe_with_request(Some(subscribe_request)).await {
             Ok(r) => r,
-            Err(e) => return Err(anyhow::Error::msg("Error: unable to subscribe")),
+            Err(e) => {
+                tracing::error!("Error: unable to subscribe with request : {:?}", e);
+                return Err(anyhow::Error::msg("Error: unable to subscribe"));
+            }
         },
         Err(e) => {
+            tracing::error!("Error: unable to build grpc stream connection {:?}", e);
             return Err(anyhow::Error::msg(
                 "Error: unable to connect to the grpc stream",
             ));
@@ -76,19 +80,21 @@ pub async fn handle_grpc_streams(
                 Ok(message) => match message.update_oneof {
                     Some(UpdateOneof::Block(message)) => {
                         if let Err(e) = block_sender.send(message) {
-                            println!("");
-                            break;
+                            tracing::error!("Error: unable to send block update {:?}", e);
+                            continue;
                         }
                     }
                     Some(UpdateOneof::Transaction(message)) => {
                         if let Err(e) = tx_sender.send(message) {
-                            println!("");
-                            break;
+                            tracing::error!("Error: unable to send transcation update {:?}", e);
+                            continue;
                         }
                     }
                     _ => {}
                 },
-                Err(e) => {}
+                Err(e) => {
+                    tracing::error!("Error: unable to parse stream data {:?}", e);
+                }
             }
         }
     });
