@@ -5,7 +5,14 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+dotenv = "0.15.0"
 futures = "0.3.31"
 tokio = {version = "1.47.1", features = ["full"]}
-yellowstone-grpc-client = "8.0.0"
-yellowstone-grpc-proto = "8.0.0"
+tokio-stream = "0.1.17"
+tracing = "0.1.41"
+tracing-subscriber = {version = "0.3.19", features = ["env-filter",
+	"fmt",
+	"json",
+	"time"]}
+yellowstone-grpc-client = "6.0.0"
+yellowstone-grpc-proto = { version = "6.0.0", default-features = false }
