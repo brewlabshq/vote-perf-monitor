@@ -15,7 +15,9 @@ use {
 };
 
 mod config;
+mod db;
 mod grpc;
+mod tracker;
 mod vote_tracking;
 
 #[tokio::main]
